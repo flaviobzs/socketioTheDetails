@@ -2,42 +2,55 @@ const express = require('express');
 const app = express();
 const socketio = require('socket.io')
 
+// dados das salas e canais 
 let namespaces = require('./data/namespaces');
-// console.log(namespaces[0]);
+
+// servir arquivos estaticos do frontend 
 app.use(express.static(__dirname + '/public'));
 const expressServer = app.listen(9000);
+// vincular servidor de socket 
 const io = socketio(expressServer);
-
 
 // io.on = io.of('/').on = io.sockets.on
 // io.emit = io.of('/').emit = io.sockets.emit
 io.on('connection',(socket)=>{
-    // console.log(socket.handshake)
+    
     // build an array to send back with the img and endpoing for each NS
+    // array com a imagem e o path para gerar os canais 
     let nsData = namespaces.map((ns)=>{
         return {
             img: ns.img,
             endpoint: ns.endpoint
         }
     })
-    // console.log(nsData)
+
     // sned the nsData back to the client. We need to use socket, NOT io, because we want it to 
-    // go to just this client. 
-    socket.emit('nsList',nsData);
+    // go to just this client.     
+    // envio para o cliente os dados 
+    socket.emit('nsList', nsData);
 })
 
-
+// conexão de todos os canais/namespaces 
 // loop through each namespace and listen for a connection
 namespaces.forEach((namespace)=>{
-    // console.log(namespace)
+
     // const thisNs = io.of(namespace.endpoint)
+    // quando alguem se conectar a um dos canal/"namespace" 
     io.of(namespace.endpoint).on('connection',(nsSocket)=>{
         console.log(nsSocket.handshake)
+        // informações do usuario conectado com o query params 
         const username = nsSocket.handshake.query.username;
         // console.log(`${nsSocket.id} has join ${namespace.endpoint}`)
         // a socket has connected to one of our chatgroup namespaces.
+
         // send that ns gorup info back
+        // enviar para o front as informações das salas de cada canal 
         nsSocket.emit('nsRoomLoad',namespace.rooms)
+
+
+// ??????????????????????????????????????????
+
+        // verificar o evento de quando alguem entra na sala 
         nsSocket.on('joinRoom',(roomToJoin,numberOfUsersCallback)=>{
             // deal with history... once we have it
             console.log(nsSocket.rooms);
@@ -55,7 +68,9 @@ namespaces.forEach((namespace)=>{
             nsSocket.emit('historyCatchUp', nsRoom.history)
             updateUsersInRoom(namespace, roomToJoin);
         })
+        // ouvir quando uma mensagem numa sala é enviada 
         nsSocket.on('newMessageToServer',(msg)=>{
+            // formatar mensagem 
             const fullMsg = {
                 text: msg.text,
                 time: Date.now(),
@@ -82,10 +97,12 @@ namespaces.forEach((namespace)=>{
     })
 })
 
+// atualizar numero de usuarios conectados na sala 
 function updateUsersInRoom(namespace, roomToJoin){
     // Send back the number of users in this room to ALL sockets connected to this room
     io.of(namespace.endpoint).in(roomToJoin).clients((error,clients)=>{
         // console.log(`There are ${clients.length} in this room`);
+        // emitir a quantidade de usuario 
         io.of(namespace.endpoint).in(roomToJoin).emit('updateMembers',clients.length)
     })
 }

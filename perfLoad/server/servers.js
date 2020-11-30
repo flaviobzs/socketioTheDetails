@@ -9,6 +9,8 @@
 // and the workers will do the Socket.io handling
 //See https://github.com/elad/node-cluster-socket.io
 
+// ponto de entrada (no master) para manipular os workers !!!!!
+
 const express = require('express');
 const cluster = require('cluster');
 const net = require('net');
@@ -23,6 +25,8 @@ const num_processes = require('os').cpus().length;
 // installed redis from https://redis.io/topics/quickstart
 // have to actually run redis via: $ redis-server (go to location of the binary)
 // check to see if it's running -- redis-cli monitor
+
+// UTILIZAR COMO ADAPTADOR E SALVAR A REFERENCIA DOS WORKS EM MEMORIA 
 const io_redis = require('socket.io-redis');
 const farmhash = require('farmhash');
 
@@ -30,6 +34,8 @@ if (cluster.isMaster) {
 	// This stores our workers. We need to keep them to be able to reference
 	// them based on source IP address. It's also useful for auto-restart,
 	// for example.
+
+	// ARMAZENAR WORKS PARA PODER TER A REFERENCIA DELES 
 	let workers = [];
 
 	// Helper function for spawning worker at index 'i'.
@@ -37,13 +43,15 @@ if (cluster.isMaster) {
 		workers[i] = cluster.fork();
 
 		// Optional: Restart worker on exit
+		// CASO O WORKER FALHER, ELE É LEVANTADO NOVAMENTE 
 		workers[i].on('exit', function(code, signal) {
 			// console.log('respawning worker', i);
 			spawn(i);
 		});
     };
 
-    // Spawn workers.
+		// Spawn workers.
+		// GERAR WORKERS!!! 
 	for (var i = 0; i < num_processes; i++) {
 		spawn(i);
 	}
@@ -56,6 +64,8 @@ if (cluster.isMaster) {
 	// Compared against "real" hashing (from the sticky-session code) and
 	// "real" IP number conversion, this function is on par in terms of
 	// worker index distribution only much faster.
+
+	// OBTER O INDICE DO WORKER BASEADO NO ENDEREÇO IP (COMPARAÇÃO DE HASHS0
 	const worker_index = function(ip, len) {
 		return farmhash.fingerprint32(ip) % len; // Farmhash is the fastest and works with IPv6, too
 	};
@@ -64,18 +74,24 @@ if (cluster.isMaster) {
     // in this case, we are going to start up a tcp connection via the net
     // module INSTEAD OF the http module. Express will use http, but we need
     // an independent tcp port open for cluster to work. This is the port that 
-    // will face the internet
+		// will face the internet
+		
+		// CRIAR SERVIDOR COM PORTAR INDEPENDENTE PARA O CLUSTER(MASTER) FUNCIONAR E DISTRIBUIR AS CONEXOES TCP  
 	const server = net.createServer({ pauseOnConnect: true }, (connection) =>{
 		// We received a connection and need to pass it to the appropriate
 		// worker. Get the worker for this connection's source IP and pass
 		// it the connection.
+
+		// REPASSAR A CONEXÃO PARA UM WORKER APROPRIADO 
 		let worker = workers[worker_index(connection.remoteAddress, num_processes)];
 		worker.send('sticky-session:connection', connection);
     });
     server.listen(port);
     console.log(`Master listening on port ${port}`);
 } else {
-    // Note we don't use a port here because the master listens on it for us.
+		// Note we don't use a port here because the master listens on it for us.
+		
+		// NÃO É NECESSARIO UMA PORTA PORQUE O MASTER É QUEM IRÁ ORQUESTRAR PARA OS DEMAIS 
     let app = express();
     // app.use(express.static(__dirname + '/public'));
     // app.use(helmet());
@@ -89,10 +105,14 @@ if (cluster.isMaster) {
 	// server is assumed to be on localhost:6379. You don't have to
 	// specify them explicitly unless you want to change them.
 	// redis-cli monitor
+
+	// INSERIR O ADAPTADOR DO REDIS COM SUAS CONFIGURAÇÕES DE CONEXAO 
 	io.adapter(io_redis({ host: 'localhost', port: 6379 }));
 
     // Here you might use Socket.IO middleware for authorization etc.
 	// on connection, send the socket over to our module with socket stuff
+
+	// LUGAR DE APLICAÇÃO DE ALGUM MIDDLEWARE 
     io.on('connection', function(socket) {
 		socketMain(io,socket);
 		console.log(`connected to worker: ${cluster.worker.id}`);

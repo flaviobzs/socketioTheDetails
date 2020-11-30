@@ -1,11 +1,15 @@
 function joinRoom(roomName){
     // Send this roomName to the server!
+    // indicar que alguem entrou na sala 
     nsSocket.emit('joinRoom', roomName,(newNumberOfMembers)=>{
         // we want to update the room member total now that we have joined!
+        // inserir quantidade de usuarios conectados na sala 
         document.querySelector('.curr-room-num-users').innerHTML = `${newNumberOfMembers} <span class="glyphicon glyphicon-user"></span>`
     })
     nsSocket.on('historyCatchUp',(history)=>{
         // console.log(history)
+        // mensagens salvas no sevidor 
+        // renderizar e focar na mais atual 
         const messagesUl = document.querySelector('#messages');
         messagesUl.innerHTML = "";
         history.forEach((msg)=>{
@@ -15,6 +19,7 @@ function joinRoom(roomName){
         messagesUl.scrollTo(0,messagesUl.scrollHeight);
     })
     nsSocket.on('updateMembers',(numMembers)=>{
+        // menbros conectados na sala 
         document.querySelector('.curr-room-num-users').innerHTML = `${numMembers} <span class="glyphicon glyphicon-user"></span>`
         document.querySelector('.curr-room-text').innerText = `${roomName}`
     })
